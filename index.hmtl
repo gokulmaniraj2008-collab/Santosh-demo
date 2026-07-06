@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multimodal AI Pipeline — Live Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#0B0E14;
+    --panel:#12161F;
+    --panel2:#161B26;
+    --border:#232938;
+    --text:#E7EAF0;
+    --muted:#7A8296;
+    --text-mode:#6EE7B7;
+    --image-mode:#7DD3FC;
+    --audio-mode:#FDBA74;
+    --danger:#F87171;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px;}
+
+  header{margin-bottom:36px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  h1{font-size:28px;line-height:1.25;margin:0 0 10px;font-weight:600;letter-spacing:-0.01em;}
+  header p{color:var(--muted);font-size:14.5px;line-height:1.6;max-width:60ch;margin:0;}
+
+  /* pipeline rail */
+  .rail{
+    display:flex;align-items:center;gap:0;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:22px 18px;
+    margin:28px 0 26px;
+    overflow-x:auto;
+  }
+  .stage{display:flex;flex-direction:column;align-items:center;min-width:96px;flex-shrink:0;}
+  .stage .dot{
+    width:14px;height:14px;border-radius:50%;
+    background:#2A3040;border:2px solid #333A4C;
+    transition:all .35s ease;
+    margin-bottom:10px;
+  }
+  .stage.active .dot{background:var(--mode,#6EE7B7);border-color:var(--mode,#6EE7B7);box-shadow:0 0 0 5px color-mix(in srgb, var(--mode,#6EE7B7) 18%, transparent);}
+  .stage .label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-align:center;letter-spacing:0.02em;}
+  .stage.active .label{color:var(--text);}
+  .track{flex:1;height:2px;background:#232938;min-width:24px;position:relative;top:-19px;transition:background .35s ease;}
+  .track.active{background:var(--mode,#6EE7B7);}
+
+  /* tabs */
+  .tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .tab{
+    flex:1;padding:12px 10px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:all .2s ease;
+  }
+  .tab:hover{color:var(--text);}
+  .tab.on{color:var(--bg);font-weight:600;}
+  .tab.on[data-mode="text"]{background:var(--text-mode);border-color:var(--text-mode);}
+  .tab.on[data-mode="image"]{background:var(--image-mode);border-color:var(--image-mode);}
+  .tab.on[data-mode="audio"]{background:var(--audio-mode);border-color:var(--audio-mode);}
+
+  /* panel */
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:22px;margin-bottom:18px;
+  }
+  .panel h3{margin:0 0 14px;font-size:14px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+
+  textarea, input[type=text]{
+    width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);padding:12px 14px;font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;
+    resize:vertical;outline:none;
+  }
+  textarea:focus, input[type=text]:focus{border-color:var(--muted);}
+  textarea{min-height:90px;}
+
+  .btn{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
+    border:none;border-radius:10px;padding:11px 18px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:8px;
+    transition:opacity .2s ease;color:var(--bg);
+  }
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn:hover:not(:disabled){opacity:.88;}
+  .btn.text-mode{background:var(--text-mode);}
+  .btn.image-mode{background:var(--image-mode);}
+  .btn.audio-mode{background:var(--audio-mode);}
+  .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+
+  .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;}
+
+  .drop{
+    border:1.5px dashed var(--border);border-radius:12px;padding:20px;text-align:center;
+    color:var(--muted);cursor:pointer;font-size:13.5px;transition:border-color .2s ease;
+  }
+  .drop:hover{border-color:var(--image-mode);}
+  .drop img{max-height:160px;border-radius:8px;margin-top:10px;}
+
+  .mic{
+    width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;
+    background:var(--audio-mode);color:var(--bg);font-size:22px;
+    display:flex;align-items:center;justify-content:center;margin:0 auto;
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .mic.rec{animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(253,186,116,.5);}70%{box-shadow:0 0 0 14px rgba(253,186,116,0);}100%{box-shadow:0 0 0 0 rgba(253,186,116,0);}}
+  .transcript{margin-top:14px;font-size:14px;color:var(--muted);min-height:20px;}
+
+  /* output console */
+  .console{
+    background:#0A0D13;border:1px solid var(--border);border-radius:14px;padding:20px 22px;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;
+    min-height:120px;white-space:pre-wrap;word-break:break-word;
+  }
+  .console .k{color:var(--muted);}
+  .console .v-text{color:var(--text-mode);}
+  .console .v-image{color:var(--image-mode);}
+  .console .v-audio{color:var(--audio-mode);}
+  .console .err{color:var(--danger);}
+  .empty{color:var(--muted);}
+
+  .speak-btn{margin-top:12px;background:none;border:1px solid var(--border);color:var(--muted);
+    padding:8px 14px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer;}
+  .speak-btn:hover{color:var(--text);border-color:var(--muted);}
+
+  footer{margin-top:40px;border-top:1px solid var(--border);padding-top:22px;}
+  footer p{color:var(--muted);font-size:12.5px;line-height:1.7;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px;}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted);}
+  th{color:var(--text);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;}
+
+  ::selection{background:#2A3040;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">CSE220 · Multimodal AI Systems</div>
+    <h1>One pipeline, three modalities.</h1>
+    <p>Type a question, upload an image, or speak — the pipeline detects the input type, routes it to Gemini Flash, and returns an answer you can also hear spoken back.</p>
+  </header>
+
+  <div class="panel" style="margin-bottom:20px;">
+    <h3>Gemini API key</h3>
+    <input type="text" id="apiKey" placeholder="Paste your Gemini API key (from aistudio.google.com/apikey)" style="font-family:'IBM Plex Mono',monospace;">
+    <div style="color:var(--muted);font-size:12px;margin-top:8px;line-height:1.6;">
+      Stored only in this browser tab for this session — never sent anywhere except Google's API. Get a free key at
+      <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--text-mode);">aistudio.google.com/apikey</a>.
+    </div>
+  </div>
+
+  <!-- pipeline rail -->
+  <div class="rail" id="rail">
+    <div class="stage" data-i="0"><div class="dot"></div><div class="label">INPUT</div></div>
+    <div class="track" data-i="0"></div>
+    <div class="stage" data-i="1"><div class="dot"></div><div class="label">DETECT</div></div>
+    <div class="track" data-i="1"></div>
+    <div class="stage" data-i="2"><div class="dot"></div><div class="label">REASON</div></div>
+    <div class="track" data-i="2"></div>
+    <div class="stage" data-i="3"><div class="dot"></div><div class="label">OUTPUT</div></div>
+  </div>
+
+  <!-- mode tabs -->
+  <div class="tabs">
+    <button class="tab on" data-mode="text" onclick="setMode('text')">✎ Text</button>
+    <button class="tab" data-mode="image" onclick="setMode('image')">▧ Image</button>
+    <button class="tab" data-mode="audio" onclick="setMode('audio')">◉ Audio</button>
+  </div>
+
+  <!-- TEXT panel -->
+  <div class="panel" id="panel-text">
+    <h3>Text input</h3>
+    <textarea id="textInput" placeholder="Ask anything — e.g. 'Explain cross-modal embeddings in two sentences.'"></textarea>
+    <div class="row">
+      <button class="btn text-mode" onclick="runText()">Send →</button>
+    </div>
+  </div>
+
+  <!-- IMAGE panel -->
+  <div class="panel" id="panel-image" style="display:none;">
+    <h3>Image input</h3>
+    <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <span id="dropLabel">Click to upload an image (photo, receipt, diagram...)</span>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="onFile(event)">
+      <div id="imgPreviewWrap"></div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <input type="text" id="imgQuestion" placeholder="What do you want to know about it? (default: describe the image)" style="flex:1;min-width:220px;">
+    </div>
+    <div class="row">
+      <button class="btn image-mode" onclick="runImage()">Analyze →</button>
+    </div>
+  </div>
+
+  <!-- AUDIO panel -->
+  <div class="panel" id="panel-audio" style="display:none;">
+    <h3>Audio input</h3>
+    <button class="mic" id="micBtn" onclick="toggleMic()">●</button>
+    <div class="transcript" id="transcriptBox">Tap the mic and speak a question.</div>
+    <div class="row">
+      <button class="btn audio-mode" id="sendAudioBtn" onclick="runAudio()" disabled>Send transcript →</button>
+    </div>
+  </div>
+
+  <!-- OUTPUT console -->
+  <div class="panel">
+    <h3>Pipeline output</h3>
+    <div class="console" id="console"><span class="empty">// waiting for input...</span></div>
+    <button class="speak-btn" id="speakBtn" style="display:none;" onclick="speakOutput()">🔊 Play spoken response</button>
+  </div>
+
+  <footer>
+    <p>Text and image calls go straight to Gemini Flash, matching Units 1–2 of the syllabus. The mic uses the Web Speech API in place of local Whisper, and the speaker button uses your browser's built-in text-to-speech in place of gTTS — both need a Python backend to run for real, which this single HTML file doesn't have.</p>
+    <table>
+      <tr><th>Unit</th><th>Concept</th><th>In this demo</th></tr>
+      <tr><td>1</td><td>Modalities &amp; embeddings</td><td>Text / Image / Audio tabs</td></tr>
+      <tr><td>2</td><td>Vision-language</td><td>Image tab → captioning &amp; VQA</td></tr>
+      <tr><td>3</td><td>Speech &amp; audio</td><td>Mic transcription + spoken output</td></tr>
+      <tr><td>4</td><td>Pipelines &amp; routing</td><td>Rail shows Input→Detect→Reason→Output</td></tr>
+      <tr><td>5</td><td>Sharing the app</td><td>This shareable single-page demo</td></tr>
+    </table>
+  </footer>
+</div>
+
+<script>
+let mode = 'text';
+let imageBase64 = null, imageMediaType = null;
+let recognition = null, isRecording = false, finalTranscript = '';
+
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.mode===m));
+  document.getElementById('panel-text').style.display = m==='text' ? 'block':'none';
+  document.getElementById('panel-image').style.display = m==='image' ? 'block':'none';
+  document.getElementById('panel-audio').style.display = m==='audio' ? 'block':'none';
+}
+
+function modeColorVar(m){
+  return m==='text' ? 'var(--text-mode)' : m==='image' ? 'var(--image-mode)' : 'var(--audio-mode)';
+}
+
+function setStage(step, m){
+  // step: 0 input, 1 detect, 2 reason, 3 output. -1 resets.
+  const color = modeColorVar(m || mode);
+  document.querySelectorAll('.stage').forEach(s=>{
+    const i = parseInt(s.dataset.i);
+    s.style.setProperty('--mode', color);
+    s.classList.toggle('active', step>=0 && i<=step);
+  });
+  document.querySelectorAll('.track').forEach(t=>{
+    const i = parseInt(t.dataset.i);
+    t.style.setProperty('--mode', color);
+    t.classList.toggle('active', step>=0 && i<step);
+  });
+}
+
+function writeConsole(html){
+  document.getElementById('console').innerHTML = html;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function callGemini(parts){
+  const key = document.getElementById('apiKey').value.trim();
+  if(!key){ throw new Error("Paste your Gemini API key above first"); }
+  const model = "gemini-2.5-flash";
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: parts }] })
+  });
+  if(!response.ok){
+    const errBody = await response.text();
+    throw new Error("Request failed (" + response.status + ")");
+  }
+  const data = await response.json();
+  const candidate = data.candidates && data.candidates[0];
+  const text = candidate && candidate.content && candidate.content.parts
+    ? candidate.content.parts.map(p => p.text || '').join('\n').trim()
+    : '';
+  return text || "(no response)";
+}
+
+/* ---------- TEXT ---------- */
+async function runText(){
+  const val = document.getElementById('textInput').value.trim();
+  if(!val){ writeConsole('<span class="err">Enter a question before sending.</span>'); return; }
+  document.getElementById('speakBtn').style.display='none';
+  setStage(0,'text'); writeConsole('<span class="k">input_type:</span> <span class="v-text">text</span>');
+  await delay(300);
+  setStage(1,'text'); writeConsole('<span class="k">input_type:</span> <span class="v-text">text</span>\n<span class="k">route:</span> text reasoning model');
+  await delay(300);
+  setStage(2,'text');
+  try{
+    const answer = await callGemini([{text: val}]);
+    setStage(3,'text');
+    writeConsole(
+      '<span class="k">input_type:</span> <span class="v-text">text</span>\n' +
+      '<span class="k">route:</span> text reasoning model\n' +
+      '<span class="k">answer:</span>\n' + escapeHtml(answer)
+    );
+    window._lastAnswer = answer;
+    document.getElementById('speakBtn').style.display='inline-flex';
+  }catch(e){
+    setStage(-1);
+    writeConsole('<span class="err">Model request failed: ' + escapeHtml(e.message) + '. Check your connection and try again.</span>');
+  }
+}
+
+/* ---------- IMAGE ---------- */
+function onFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  imageMediaType = file.type;
+  const reader = new FileReader();
+  reader.onload = () => {
+    imageBase64 = reader.result.split(',')[1];
+    document.getElementById('imgPreviewWrap').innerHTML =
+      '<img src="' + reader.result + '" alt="uploaded preview">';
+    document.getElementById('dropLabel').textContent = file.name + ' — click to change';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runImage(){
+  if(!imageBase64){ writeConsole('<span class="err">Upload an image before analyzing.</span>'); return; }
+  const q = document.getElementById('imgQuestion').value.trim() || 'Describe what is in this image.';
+  document.getElementById('speakBtn').style.display='none';
+  setStage(0,'image'); writeConsole('<span class="k">input_type:</span> <span class="v-image">image</span>');
+  await delay(300);
+  setStage(1,'image'); writeConsole('<span class="k">input_type:</span> <span class="v-image">image</span>\n<span class="k">route:</span> vision-language model');
+  await delay(300);
+  setStage(2,'image');
+  try{
+    const answer = await callGemini([
+      { inline_data: { mime_type: imageMediaType, data: imageBase64 } },
+      { text: q }
+    ]);
+    setStage(3,'image');
+    writeConsole(
+      '<span class="k">input_type:</span> <span class="v-image">image</span>\n' +
+      '<span class="k">route:</span> vision-language model\n' +
+      '<span class="k">question:</span> ' + escapeHtml(q) + '\n' +
+      '<span class="k">answer:</span>\n' + escapeHtml(answer)
+    );
+    window._lastAnswer = answer;
+    document.getElementById('speakBtn').style.display='inline-flex';
+  }catch(e){
+    setStage(-1);
+    writeConsole('<span class="err">Model request failed: ' + escapeHtml(e.message) + '. Check your connection and try again.</span>');
+  }
+}
+
+/* ---------- AUDIO ---------- */
+function initRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return null;
+  const r = new SR();
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.onresult = (e) => {
+    let interim = '';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    document.getElementById('transcriptBox').textContent = (finalTranscript + interim) || 'Listening...';
+    document.getElementById('sendAudioBtn').disabled = !finalTranscript.trim();
+  };
+  r.onerror = () => { stopMic(); };
+  r.onend = () => { if(isRecording){ isRecording=false; document.getElementById('micBtn').classList.remove('rec'); } };
+  return r;
+}
+
+function toggleMic(){
+  if(!recognition) recognition = initRecognition();
+  if(!recognition){
+    document.getElementById('transcriptBox').textContent = 'Speech recognition is not supported in this browser — try Chrome.';
+    return;
+  }
+  if(isRecording){ stopMic(); }
+  else{
+    finalTranscript = '';
+    document.getElementById('sendAudioBtn').disabled = true;
+    document.getElementById('transcriptBox').textContent = 'Listening...';
+    recognition.start();
+    isRecording = true;
+    document.getElementById('micBtn').classList.add('rec');
+  }
+}
+function stopMic(){
+  isRecording = false;
+  document.getElementById('micBtn').classList.remove('rec');
+  try{ recognition.stop(); }catch(e){}
+}
+
+async function runAudio(){
+  const val = finalTranscript.trim();
+  if(!val){ writeConsole('<span class="err">Record a question before sending.</span>'); return; }
+  document.getElementById('speakBtn').style.display='none';
+  setStage(0,'audio'); writeConsole('<span class="k">input_type:</span> <span class="v-audio">audio</span>\n<span class="k">transcript:</span> ' + escapeHtml(val));
+  await delay(300);
+  setStage(1,'audio'); writeConsole('<span class="k">input_type:</span> <span class="v-audio">audio</span>\n<span class="k">transcript:</span> ' + escapeHtml(val) + '\n<span class="k">route:</span> text reasoning model');
+  await delay(300);
+  setStage(2,'audio');
+  try{
+    const answer = await callGemini([{text: val}]);
+    setStage(3,'audio');
+    writeConsole(
+      '<span class="k">input_type:</span> <span class="v-audio">audio</span>\n' +
+      '<span class="k">transcript:</span> ' + escapeHtml(val) + '\n' +
+      '<span class="k">route:</span> text reasoning model\n' +
+      '<span class="k">answer:</span>\n' + escapeHtml(answer)
+    );
+    window._lastAnswer = answer;
+    document.getElementById('speakBtn').style.display='inline-flex';
+  }catch(e){
+    setStage(-1);
+    writeConsole('<span class="err">Model request failed: ' + escapeHtml(e.message) + '. Check your connection and try again.</span>');
+  }
+}
+
+/* ---------- TTS output ---------- */
+function speakOutput(){
+  if(!window._lastAnswer) return;
+  if(!('speechSynthesis' in window)){
+    alert('Speech synthesis not supported in this browser.');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(window._lastAnswer);
+  window.speechSynthesis.speak(u);
+}
+
+setStage(-1);
+</script>
+</body>
+</html>
+  
